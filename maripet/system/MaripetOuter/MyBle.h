@@ -2,6 +2,7 @@
 
 BLE ble;
 
+
 #define BLINK_PIN_MOBILE D3
 // Connect handle
 static uint16_t peripheral_handle = BLE_CONN_HANDLE_INVALID;
@@ -37,6 +38,7 @@ static const uint8_t uart_base_uuid_rev[]    = {0x1E, 0x94, 0x8D, 0xF1, 0x48, 0x
 uint8_t txPayload[TXRX_BUF_LEN] = {0,};
 uint8_t rxPayload[TXRX_BUF_LEN] = {0,};
 uint8_t chars3_value[TXRX_BUF_LEN] = {0x01, 0x02, 0x03};
+bool central_connected = false;
 //Characteristic Property Setting etc
 GattCharacteristic  txCharacteristic (tx_uuid, txPayload, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ);
 GattCharacteristic  rxCharacteristic (rx_uuid, rxPayload, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY| GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ);
@@ -77,6 +79,7 @@ void connectcallback( const Gap::ConnectionCallbackParams_t *params)
   else{
       Serial.println("CONNET to CENTRAL DEVIDE");
       peripheral_handle = params->handle;
+      central_connected = true;
   }
 }
 void disconnection(const Gap::DisconnectionCallbackParams_t *paramss)
@@ -87,6 +90,7 @@ void disconnection(const Gap::DisconnectionCallbackParams_t *paramss)
   if(peripheral_handle == paramss->handle){
     Serial.println("re Advertising");
     peripheral_handle = BLE_CONN_HANDLE_INVALID;
+    central_connected = false;
     ble.startAdvertising();
   }
   else{
@@ -162,6 +166,14 @@ void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::
     ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, chars_hrm.getConnectionHandle(), desc_of_chars_hrm.getAttributeHandle(), 2, (uint8_t *)&value);
   }
 }
+//Coreへの指示
+void moterControll(int num){
+  if(central_connected){
+    tx_buf[0] = num;
+    ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  }
+}
+
 //Notify通知かindicateが来た時の処理
 void hvxCallback(const GattHVXCallbackParams *params)
 { 
