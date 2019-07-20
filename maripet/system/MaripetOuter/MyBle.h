@@ -1,9 +1,19 @@
 #include <nRF5x_BLE_API.h>
+#include <arduino.h>
 
 BLE ble;
 
+//control flag 
+bool isMove = false;
+bool isFrec = false;
+bool isLED = false;
+bool isDemoMode = false;
 
-#define BLINK_PIN_MOBILE D3
+
+#define PIN_BLE_MODE D4
+bool BLE_CONNECT_MOBILE = false;
+
+#define BLINK_PIN_MOBILE 13
 // Connect handle
 static uint16_t peripheral_handle = BLE_CONN_HANDLE_INVALID;
 static uint16_t client_handle     = BLE_CONN_HANDLE_INVALID;
@@ -62,13 +72,12 @@ void onDataReadCallback(const GattReadCallbackParams *params);
 uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advdata, uint8_t *len,uint8_t *p_field_data);
 void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) ;
 
-
-
 //-------------------------------------------------------------------------------------------------
 void connectcallback( const Gap::ConnectionCallbackParams_t *params)
 {
+  //Serial.println("CONNECTED");
   if(params->role == Gap::CENTRAL){
-     Serial.println("CONNECTed by PERIFERAL DEVIDE");
+     //Serial.println("CONNECTed by PERIFERAL DEVIDE");
      //discoveredServiceCallBack：Serviceを探す
      //discoveredCharacteristicCallBack:Characteristicを探してUUIDをと取得
      if(device_is_hrm){
@@ -77,24 +86,25 @@ void connectcallback( const Gap::ConnectionCallbackParams_t *params)
      client_handle = params->handle;
   }
   else{
-      Serial.println("CONNET to CENTRAL DEVIDE");
+      //Serial.println("CONNET to CENTRAL DEVIDE");
       peripheral_handle = params->handle;
       central_connected = true;
+      
   }
 }
 void disconnection(const Gap::DisconnectionCallbackParams_t *paramss)
 {
   //リセット  
-  Serial.println("Disconnected, start to scanning");
+  //Serial.println("Disconnected, start to scanning");
 
   if(peripheral_handle == paramss->handle){
-    Serial.println("re Advertising");
+    //Serial.println("re Advertising");
     peripheral_handle = BLE_CONN_HANDLE_INVALID;
     central_connected = false;
     ble.startAdvertising();
   }
   else{
-    Serial.println("re scanning");
+    //Serial.println("re scanning");
     client_handle = BLE_CONN_HANDLE_INVALID;
     device_is_hrm = 0;
     characteristic_is_fond = 0;
@@ -108,18 +118,17 @@ void disconnection(const Gap::DisconnectionCallbackParams_t *paramss)
 void scanCallBack(const Gap::AdvertisementCallbackParams_t *params)
 {
   uint8_t index;
- 
   uint8_t len;
   uint8_t adv_name[31];
   if( NRF_SUCCESS == ble_advdata_parser(BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME, params->advertisingDataLen, (uint8_t *)params->advertisingData, &len, adv_name) ) {
 
     if(memcmp(PERIFERAL_NAME, adv_name, len) == 0x00) {
-      Serial.print("Complete name is : ");
-      Serial.println((const char*)adv_name);
+      //Serial.print("Complete name is : ");
+      //Serial.println((const char*)adv_name);
       ble.stopScan();
       device_is_hrm = 1;
       ble.connect(params->peerAddr, BLEProtocol::AddressType::RANDOM_STATIC, NULL, NULL);
-      Serial.println("Got device, stop scan Mobile");
+      //Serial.println("Got device, stop scan Mobile");
       digitalWrite(BLINK_PIN_MOBILE, HIGH);
       ble.startAdvertising();
     }
@@ -127,24 +136,24 @@ void scanCallBack(const Gap::AdvertisementCallbackParams_t *params)
 
 }
 void discoveredServiceCallBack(const DiscoveredService *service) {
-  Serial.println("\r\n----Service Discovered");
+  //Serial.println("\r\n----Service Discovered");
 
   if(service->getUUID().shortOrLong() == UUID::UUID_TYPE_SHORT) {
-    Serial.println(service->getUUID().getShortUUID(), HEX);
+    //Serial.println(service->getUUID().getShortUUID(), HEX);
   }
   else {
     uint8_t index;
     const uint8_t *uuid = service->getUUID().getBaseUUID();
     for(index=0; index<16; index++) {
-      Serial.print(uuid[index], HEX);
-      Serial.print(" ");
+      //Serial.print(uuid[index], HEX);
+      //Serial.print(" ");
     }
-    Serial.println(" ");
+    //Serial.println(" ");
   }
 }
 //ペアリング後の処理　Notifyを受け取る準備
 void discoveryTerminationCallback(Gap::Handle_t connectionHandle){
-  Serial.println("\r\n----Characteristic Discovered");
+  //Serial.println("\r\n----Characteristic Discovered");
  if(characteristic_is_fond == 1) {
     ble.gattClient().discoverCharacteristicDescriptors(chars_hrm, discoveredCharsDescriptorCallBack, discoveredDescTerminationCallBack);
   }
@@ -160,7 +169,7 @@ void discoveredCharsDescriptorCallBack(const CharacteristicDescriptorDiscovery::
 //ペリフェラルから通知を受け取る準備
 void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::TerminationCallbackParams_t *params) {
   if(descriptor_is_found) {
-    Serial.println("Open HRM notify");
+    //Serial.println("Open HRM notify");
     //valueを送ってNotifyを許可
     uint16_t value = 0x0001;
     ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, chars_hrm.getConnectionHandle(), desc_of_chars_hrm.getAttributeHandle(), 2, (uint8_t *)&value);
@@ -177,21 +186,100 @@ void moterControll(int num){
 //Notify通知かindicateが来た時の処理
 void hvxCallback(const GattHVXCallbackParams *params)
 { 
-  
-  if(memcmp(params->data, "GO",2) == 0x00){Serial.print("GO"); tx_buf[0] = 0;}
-  if(memcmp(params->data, "RIGHT",5) == 0x00){Serial.print("RIGHT");tx_buf[0] = 1;}
-  if(memcmp(params->data, "LEFT",4) == 0x00){Serial.print("LEFT");tx_buf[0] = 2;}
-  if(memcmp(params->data, "BACK",4) == 0x00){Serial.print("BACK");tx_buf[0] = 3;}
+  //moter
+  if(memcmp(params->data, "GO",2) == 0x00){ 
+    //Serial.println("GO");
+    tx_buf[0] = 0;
+  }else if(memcmp(params->data, "RIGHT",5) == 0x00){
+    //Serial.println("RIGHT");
+    tx_buf[0] = 1;
+  }else if(memcmp(params->data, "LEFT",4) == 0x00){
+    //Serial.println("LEFT");
+    tx_buf[0] = 2;
+  }else if(memcmp(params->data, "BACK",4) == 0x00){
+    //Serial.println("BACK");
+    tx_buf[0] = 3;
+  }else if(memcmp(params->data, "STOP",4) == 0x00){
+    //Serial.println("STOP");
+    tx_buf[0] = 4;
+  }else if(memcmp(params->data, "MOVE_0",6) == 0x00){
+    //Serial.println("MOVE_F");
+    isMove = false; tx_buf[0] = 4; 
+    ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  }
+  else if(memcmp(params->data, "MOVE_1",6) == 0x00){
+    //Serial.println("MOVE_T");
+    isMove = true; 
+  }
+  //LED
+  else if(memcmp(params->data, "LED_0",5) == 0x00){
+    //Serial.println("LED_F");
+    isLED = false; 
+  }else if(memcmp(params->data, "LED_1",5) == 0x00){
+    //Serial.println("LED_T");
+    isLED = true; 
+  }
+  //frec
+  else if(memcmp(params->data, "frec_0",6) == 0x00){
+    //Serial.println("VIB_F");
+    isFrec = false; 
+  }else if(memcmp(params->data, "frec_1",6) == 0x00){
+    //Serial.println("VIB_T");
+    isFrec = true; 
+  }
+  //demo
+  else if(memcmp(params->data, "demo_0",6) == 0x00){
+    //Serial.println("DEMO_F");
+    isDemoMode = false; 
+
+  }else if(memcmp(params->data, "demo_1",6) == 0x00){
+    //Serial.println("DEMO_T");
+    isDemoMode = true; 
+  }
   
   //動的なデータを送信
+  if(isMove){
+   // Serial.println("SEND");
+     ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  }
+}
+
+void demo(){
+  tx_buf[0] = 0;
+  ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  delay(1000);
+  tx_buf[0] = 1;
+  ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  delay(1000);
+  tx_buf[0] = 2;
+  ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  delay(1000);
+  tx_buf[0] = 3;
+  ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  delay(1000);  
+
+  if(!isDemoMode){
+    isDemoMode = false; 
+    tx_buf[0] = 4; 
+    ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  }
+}
+
+void updateCV(int val){
+   //動的なデータを送信
+  tx_buf[0] = val;
   ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
 }
 //Write
 void onDataWriteCallback(const GattWriteCallbackParams *params)
-{ Serial.println("GattClient write");}
+{ 
+  //Serial.println("GattClient write");
+}
 //Read
 void onDataReadCallback(const GattReadCallbackParams *params)
-{ Serial.println("GattClinet read");}
+{ 
+  //Serial.println("GattClinet read");
+}
 //デコーダー
 uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advdata, uint8_t *len,uint8_t *p_field_data)
 {
@@ -212,12 +300,12 @@ uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advda
 }
 //Caractersitcを発見した時の処理（onConnectinonで呼ばれる）
 void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
-  Serial.println("\r\n----Characteristic Discovered");
+ // Serial.println("\r\n----Characteristic Discovered");
 
   if(chars->getUUID().shortOrLong() == UUID::UUID_TYPE_SHORT) {
-    Serial.println(chars->getUUID().getShortUUID(), HEX);
+    //Serial.println(chars->getUUID().getShortUUID(), HEX);
     if(chars->getUUID().getShortUUID() == 0x2A37) {
-      Serial.println("Found HRM characteristic ");
+      //Serial.println("Found HRM characteristic ");
       characteristic_is_fond = 1;
       chars_hrm = *chars;
     }
@@ -226,7 +314,7 @@ void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
     uint8_t index;
     const uint8_t *uuid = chars->getUUID().getBaseUUID();
     for(index=0; index<16; index++) {
-      Serial.print(uuid[index], HEX);
+     // Serial.print(uuid[index], HEX);
     }
   }
 }
@@ -236,15 +324,15 @@ void dataWriteCallback(const GattWriteCallbackParams *Handler){
 
   uint8_t buf[TXRX_BUF_LEN];
   uint16_t bytesRead = 20;
-  Serial.println("Write Handle : ");
+ // Serial.println("Write Handle : ");
   // Check the attribute belong to which characteristic
   if (Handler->handle == rxCharacteristic.getValueAttribute().getHandle()) {
     // Read the value of characteristic
     ble.readCharacteristicValue(rxCharacteristic.getValueAttribute().getHandle(), buf, &bytesRead);
     for(index=0; index<bytesRead; index++) {
-      Serial.print(buf[index], HEX);
+      //Serial.print(buf[index], HEX);
     }
-    Serial.println(" ");
+    //Serial.println(" ");
   }
 }
 
@@ -265,9 +353,9 @@ void task_handle(void) {
   tx_buf[2] += 2;
 
   //BLEデータ送信
-  Serial.print(tx_buf[0]); Serial.print("\t");
-  Serial.print(tx_buf[1]); Serial.print("\t");
-  Serial.println(tx_buf[2]);
+//  Serial.print(tx_buf[0]); Serial.print("\t");
+//  Serial.print(tx_buf[1]); Serial.print("\t");
+//  Serial.println(tx_buf[2]);
 
   
   //動的なデータを送信
@@ -302,17 +390,38 @@ void setupBle(){
   //start adv
   ble.setAdvertisingInterval(160);
   ble.setAdvertisingTimeout(0);
-  ble.startAdvertising();
-  
+  //if(BLE_CONNECT_MOBILE){
+    ble.startAdvertising();
+  //}
   //scan
   ble.setScanParams(1000, 200, 0, false);
   ble.startScan(scanCallBack);
   pinMode( 13, OUTPUT);
   pinMode(BLINK_PIN_MOBILE, OUTPUT);
   digitalWrite(BLINK_PIN_MOBILE,LOW);
+
+  pinMode(PIN_BLE_MODE, INPUT);
+
+  pinMode(D3,INPUT);
 }
 void loopBle(){
-  ble.waitForEvent();  
+  ble.waitForEvent(); 
+
+//  int b = analogRead(D3);
+//  tx_buf[0] = b;  
+//  //動的なデータを送信
+//  ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+   
+  static bool preState;
+  //bool state = analogRead(PIN_BLE_MODE);
+
+
+  
+//  if(state && preState){
+//    BLE_CONNECT_MOBILE = !BLE_CONNECT_MOBILE;
+//    setupBle();
+//  }
+//  preState = state;
 }
 
 void resetForMobileConnection(){
