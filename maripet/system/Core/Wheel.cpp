@@ -49,6 +49,10 @@ void Wheel::Setup() {
     pinMode(pinR1_pwm, OUTPUT);
     pinMode(pinL0_pwm, OUTPUT);
     pinMode(pinL1_pwm, OUTPUT);
+    digitalWrite(pinR0_pwm,LOW);
+    digitalWrite(pinR1_pwm,LOW);
+    digitalWrite(pinL0_pwm,LOW);
+    digitalWrite(pinL1_pwm,LOW);
   }
   else {
     pinMode(pinR0, OUTPUT);

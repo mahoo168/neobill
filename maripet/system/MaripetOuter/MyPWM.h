@@ -39,6 +39,7 @@ public:
   void setup(int _pin, int pwm){
     pin = _pin;
     pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW);
     highTime = itv * pwm / res; 
     write(pwm);
     //Serial.println(nextHighTime);

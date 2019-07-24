@@ -7,10 +7,10 @@
 #define MOTER_LEFT 2
 #define MOTER_BACK 3
 
-#define PIN_R D6
-#define PIN_G D7
-#define PIN_B D8
-#define PIN_FREC_MOTER D9
+#define PIN_R D7
+#define PIN_G D8
+#define PIN_B D9
+#define PIN_FREC_MOTER D6
 
 Ticker ticker;
 MyPWM ledR;
@@ -70,9 +70,9 @@ void loop() {
 
       int r, g, b = 0;
       HSV2RGB(h , s, v, r, g, b);
-      ledR.write(r * 4 );
-      ledG.write(g * 4 );
-      ledB.write(b * 4 );
+      ledR.write(r );
+      ledG.write(g );
+      ledB.write(b );
       frec_Moter.write(t);
       tcount = 0;
     }
