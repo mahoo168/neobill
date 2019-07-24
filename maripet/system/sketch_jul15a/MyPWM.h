@@ -5,16 +5,13 @@ private:
   int highTime;
   int nextHighTime;
   const int itv = 2000;
-  const int res = 1024;
+  const int res = 1000;
   unsigned long preTime;
   bool flagHIGH = true;
   
 public:
   void write(int pwm){
-      pwm = max(0,pwm);
-      pwm = min(res, pwm);
       nextHighTime = itv * pwm / res; 
-      
   }
   void loop(){
     unsigned long currenttime = micros();
@@ -23,7 +20,6 @@ public:
          digitalWrite(pin, LOW);
          flagHIGH = false;
          preTime = currenttime;
-         //Serial.println("HIGH");
       }
     }
     else{
@@ -42,8 +38,5 @@ public:
     highTime = itv * pwm / res; 
     write(pwm);
     //Serial.println(nextHighTime);
-  }
-  void stop(){
-    digitalWrite(pin, LOW);
   }
 };

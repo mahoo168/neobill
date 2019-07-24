@@ -6,14 +6,13 @@ BLE ble;
 //control flag 
 bool isMove = false;
 bool isFrec = false;
-bool isLED = false;
+bool isLED = true;
 bool isDemoMode = false;
-
-
+int demo_go_time = 3000;
 #define PIN_BLE_MODE D4
 bool BLE_CONNECT_MOBILE = false;
 
-#define BLINK_PIN_MOBILE 13
+#define BLINK_PIN 13
 // Connect handle
 static uint16_t peripheral_handle = BLE_CONN_HANDLE_INVALID;
 static uint16_t client_handle     = BLE_CONN_HANDLE_INVALID;
@@ -73,9 +72,14 @@ uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advda
 void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) ;
 
 //-------------------------------------------------------------------------------------------------
+void writeSensorDataToAnroid(int val){
+  uint8_t sendData[1] = {val};
+  ble.gattServer().write(client_handle,sendData,1,false);
+}
+
 void connectcallback( const Gap::ConnectionCallbackParams_t *params)
 {
-  //Serial.println("CONNECTED");
+  Serial.println("CONNECTED");
   if(params->role == Gap::CENTRAL){
      //Serial.println("CONNECTed by PERIFERAL DEVIDE");
      //discoveredServiceCallBack：Serviceを探す
@@ -84,6 +88,7 @@ void connectcallback( const Gap::ConnectionCallbackParams_t *params)
        ble.gattClient().launchServiceDiscovery(params->handle, discoveredServiceCallBack, discoveredCharacteristicCallBack, service_uuid, chars_uuid1);
      }
      client_handle = params->handle;
+     ble.startAdvertising();
   }
   else{
       //Serial.println("CONNET to CENTRAL DEVIDE");
@@ -109,7 +114,7 @@ void disconnection(const Gap::DisconnectionCallbackParams_t *paramss)
     device_is_hrm = 0;
     characteristic_is_fond = 0;
     descriptor_is_found = 0;
-    digitalWrite(BLINK_PIN_MOBILE,LOW);
+    digitalWrite(BLINK_PIN,LOW);
     ble.startScan(scanCallBack);   
   }
 
@@ -129,7 +134,7 @@ void scanCallBack(const Gap::AdvertisementCallbackParams_t *params)
       device_is_hrm = 1;
       ble.connect(params->peerAddr, BLEProtocol::AddressType::RANDOM_STATIC, NULL, NULL);
       //Serial.println("Got device, stop scan Mobile");
-      digitalWrite(BLINK_PIN_MOBILE, HIGH);
+      digitalWrite(BLINK_PIN, HIGH);
       ble.startAdvertising();
     }
   }
@@ -186,6 +191,7 @@ void moterControll(int num){
 //Notify通知かindicateが来た時の処理
 void hvxCallback(const GattHVXCallbackParams *params)
 { 
+  digitalWrite(BLINK_PIN, !digitalRead(BLINK_PIN));
   //moter
   if(memcmp(params->data, "GO",2) == 0x00){ 
     //Serial.println("GO");
@@ -238,25 +244,29 @@ void hvxCallback(const GattHVXCallbackParams *params)
   }
   
   //動的なデータを送信
-  if(isMove){
+  if(isMove && central_connected){
    // Serial.println("SEND");
      ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+     delay(1000);
+     digitalWrite(BLINK_PIN, !digitalRead(BLINK_PIN));
+     delay(1000);
+     digitalWrite(BLINK_PIN, !digitalRead(BLINK_PIN));
   }
 }
-
+//demo func
 void demo(){
-  tx_buf[0] = 0;
-  ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
-  delay(1000);
   tx_buf[0] = 1;
   ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
-  delay(1000);
-  tx_buf[0] = 2;
+  delay(demo_go_time);
+  tx_buf[0] = 1;
   ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
-  delay(1000);
-  tx_buf[0] = 3;
+  delay(demo_go_time);
+  tx_buf[0] = 1;
   ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
-  delay(1000);  
+  delay(demo_go_time);
+  tx_buf[0] = 1;
+  ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
+  delay(demo_go_time);  
 
   if(!isDemoMode){
     isDemoMode = false; 
@@ -273,12 +283,12 @@ void updateCV(int val){
 //Write
 void onDataWriteCallback(const GattWriteCallbackParams *params)
 { 
-  //Serial.println("GattClient write");
+  Serial.println("GattClient write");
 }
 //Read
 void onDataReadCallback(const GattReadCallbackParams *params)
 { 
-  //Serial.println("GattClinet read");
+  Serial.println("GattClinet read");
 }
 //デコーダー
 uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advdata, uint8_t *len,uint8_t *p_field_data)
@@ -321,7 +331,7 @@ void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
 
 void dataWriteCallback(const GattWriteCallbackParams *Handler){
   uint8_t index;
-
+Serial.println("aa ");
   uint8_t buf[TXRX_BUF_LEN];
   uint16_t bytesRead = 20;
  // Serial.println("Write Handle : ");
@@ -397,8 +407,8 @@ void setupBle(){
   ble.setScanParams(1000, 200, 0, false);
   ble.startScan(scanCallBack);
   pinMode( 13, OUTPUT);
-  pinMode(BLINK_PIN_MOBILE, OUTPUT);
-  digitalWrite(BLINK_PIN_MOBILE,LOW);
+  pinMode(BLINK_PIN, OUTPUT);
+  digitalWrite(BLINK_PIN,LOW);
 
   pinMode(PIN_BLE_MODE, INPUT);
 
@@ -453,7 +463,6 @@ void resetForMobileConnection(){
   //scan
   ble.setScanParams(1000, 200, 0, false);
   ble.startScan(scanCallBack);
-  pinMode( 13, OUTPUT);
-  pinMode(BLINK_PIN_MOBILE, OUTPUT);
-  digitalWrite(BLINK_PIN_MOBILE,LOW);
+  pinMode(BLINK_PIN, OUTPUT);
+  digitalWrite(BLINK_PIN,LOW);
 }

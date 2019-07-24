@@ -3,14 +3,22 @@
 
 //whieel
 Wheel wheel;
-
+int movestate;
+//acc
+#define PIN_ACC_X D1
+#define PIN_ACC_Y D0
+#define PIN_ACC_Z D3
+const int balanced= 255;
 //BLE
 BLE ble;
-
+Ticker ticker;
+bool isDebug = false;
+bool isConnected = false;
 #define BLINK_PIN_MOBILE 13
-
+bool state = false;
 //menber
 #define OUTER_NAME "OUTER"
+static uint16_t handle = BLE_CONN_HANDLE_INVALID;
 uint8_t device_is_hrm = 0;
 static uint8_t characteristic_is_fond = 0;
 static uint8_t descriptor_is_found = 0;
@@ -39,17 +47,41 @@ void onDataReadCallback(const GattReadCallbackParams *params);
 uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advdata, uint8_t *len,uint8_t *p_field_data);
 void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) ;
 
-
+//-------------------------------------------------------------------------------------------------------------------------------------------
+void callback(){
+  //ble
+  ble.waitForEvent();
+//  uint8_t sendData[1] = {1};
+//  // ble.gattServer().write(handle,sendData,1,false);
+//  if(isConnected){
+//     uint8_t temp[] = "abcde";
+//  //ble.writeValue(device.connected_handle, device.service.chars[0].chars.value_handle, 5, temp);
+////  ble.gattClient().write(GattClient::GATT_OP_WRITE_CMD, 
+////                          handle,
+////                          desc_of_chars_hrm.getAttributeHandle()
+////                          ,1,sendData);
+//// Serial.println("write");
+////  }
+ 
+}
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("CORE START");
-  
+  if(isDebug){
+     Serial.begin(9600);
+     Serial.println("CORE START");
+  }
+  movestate =  MOTER_GO;
   // put your setup code here, to run once:
   //駆動部
-  wheel.Setup(1,2,0,3,4,5);
-  wheel.Speed(200);
-
+  //wheel.Setup(1,2,0,3,4,5);
+  wheel.setPWM(true);
+  wheel.Speed(500);
+  wheel.Setup();
+  //wheel.mode = MOTER_GO;
+  //wheel.setPWM(true);
+  //wheel.Speed(1000);
+  //wheel.Speed(255);
+  
   //BLE
   ble.init();
   //callback
@@ -64,47 +96,46 @@ void setup() {
   ble.setScanParams(1000, 200, 0, false);
   ble.setActiveScan(true);
   ble.startScan(scanCallBack);
+  ticker.attach(callback, 1);
  
   pinMode(BLINK_PIN_MOBILE, OUTPUT);
-  digitalWrite(BLINK_PIN_MOBILE, LOW);
+  //digitalWrite(BLINK_PIN_MOBILE, HIGH);
+  //ACC
+  pinMode(PIN_ACC_X, INPUT);
+  pinMode(PIN_ACC_Y, INPUT);
+  pinMode(PIN_ACC_Z, INPUT);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-//  wheel.Go();
-//  delay(1000);
-//
-//  wheel.Right();
-//  delay(1000);
-//  wheel.Left();
-//  delay(1000);
-//
-//  wheel.Stop();
-//  delay(1000);
-
-  //ble
-  ble.waitForEvent();
+  // puxt your main code here, to run repeatedly:
+  int accZ = analogRead(PIN_ACC_Z);
+  wheel.Loop();
+  wheel.Speed(2000 - abs(accZ-255) * 2000 / 255);
 }
 
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------------------------------------
 void connectcallback( const Gap::ConnectionCallbackParams_t *params)
 {
-  Serial.println("Connection callback Mobile");
-  
+  //Serial.println("Connection callback Mobile");
+  isConnected  = true;
   //デバイスの検索
   //discoveredServiceCallBack：Serviceを探す
   //discoveredCharacteristicCallBack:Characteristicを探してUUIDをと取得
+  handle = params->handle;
   ble.gattClient().launchServiceDiscovery(params->handle, NULL, discoveredCharacteristicCallBack, service_uuid);
 }
 void disconnection(const Gap::DisconnectionCallbackParams_t *paramss)
 {
   //リセット  
-  Serial.println("Disconnected, start to scanning");
+  //Serial.println("Disconnected, start to scanning");
   device_is_hrm = 0;
   characteristic_is_fond = 0;
   descriptor_is_found = 0;
   digitalWrite(BLINK_PIN_MOBILE,LOW);
+  if(isDebug){
+    Serial.println("disconnected");
+  }
   ble.startScan(scanCallBack);
 } 
 //周辺危機を探索
@@ -115,41 +146,41 @@ void scanCallBack(const Gap::AdvertisementCallbackParams_t *params)
   uint8_t len;
   uint8_t adv_name[31];
   if( NRF_SUCCESS == ble_advdata_parser(BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME, params->advertisingDataLen, (uint8_t *)params->advertisingData, &len, adv_name) ) {
-    
+       //Serial.print("Complete name is : ");
+      //Serial.println((const char*)adv_name);  
 
     if(memcmp(OUTER_NAME, adv_name, len) == 0x00) {
-      Serial.print("Complete name is : ");
-      Serial.println((const char*)adv_name);
+ 
       ble.stopScan();
       device_is_hrm = 1;
       ble.connect(params->peerAddr, BLEProtocol::AddressType::RANDOM_STATIC, NULL, NULL);
-      Serial.println("Got device, stop scan Mobile");
+      //Serial.println("Got device, stop scan Mobile");
       digitalWrite(BLINK_PIN_MOBILE, HIGH);
     }
   }
 
 }
 void discoveredServiceCallBack(const DiscoveredService *service) {
-  Serial.println("\r\n----Service Discovered");
+  //Serial.println("\r\n----Service Discovered");
 
   if(service->getUUID().shortOrLong() == UUID::UUID_TYPE_SHORT) {
-    Serial.println(service->getUUID().getShortUUID(), HEX);
+    //Serial.println(service->getUUID().getShortUUID(), HEX);
   }
   else {
     uint8_t index;
     const uint8_t *uuid = service->getUUID().getBaseUUID();
     for(index=0; index<16; index++) {
-      Serial.print(uuid[index], HEX);
-      Serial.print(" ");
+      //Serial.print(uuid[index], HEX);
+      //Serial.print(" ");
     }
-    Serial.println(" ");
+    //Serial.println(" ");
   }
 }
 //ペアリング後の処理　Notifyを受け取る準備
 void discoveryTerminationCallback(Gap::Handle_t connectionHandle){
-  Serial.println("\r\n----CdiscoveryTermination");
+  //Serial.println("\r\n----CdiscoveryTermination");
  if(characteristic_is_fond == 1) {
-  Serial.println("\r\n----Characteristic Discovered rry");
+  //Serial.println("\r\n----Characteristic Discovered rry");
     ble.gattClient().discoverCharacteristicDescriptors(chars_hrm, discoveredCharsDescriptorCallBack, discoveredDescTerminationCallBack);
   }
 }
@@ -164,7 +195,7 @@ void discoveredCharsDescriptorCallBack(const CharacteristicDescriptorDiscovery::
 //ペリフェラルから通知を受け取る準備
 void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::TerminationCallbackParams_t *params) {
   if(descriptor_is_found) {
-    Serial.println("Open HRM notify");
+    //Serial.println("Open HRM notify");
     //valueを送ってNotifyを許可
     uint16_t value = 0x0001;
     ble.gattClient().write(GattClient::GATT_OP_WRITE_REQ, chars_hrm.getConnectionHandle(), desc_of_chars_hrm.getAttributeHandle(), 2, (uint8_t *)&value);
@@ -174,19 +205,56 @@ void discoveredDescTerminationCallBack(const CharacteristicDescriptorDiscovery::
 //Notify通知かindicateが来た時の処理
 void hvxCallback(const GattHVXCallbackParams *params)
 { 
-
-
-  if(params->data[0] == 0){Serial.print("GO");wheel.Go();;}
-  if(params->data[0] == 1){Serial.print("RIGHT");wheel.Right();}
-  if(params->data[0] == 2){Serial.print("LEFT");wheel.Left();}
-  if(params->data[0] == 3){Serial.print("BACK");wheel.Back();}
+ if(isDebug){
+    Serial.println(params->data[0]);
+  }
+  if(state){
+    digitalWrite(BLINK_PIN_MOBILE, HIGH);
+    state = false;
+  }
+  else{
+    digitalWrite(BLINK_PIN_MOBILE, LOW);
+    state = true;    
+  }
+  
+//  if(params->data[0] == MOTER_GO){
+//    //Serial.print("GO");
+//    //wheel.Go();;
+//    wheel.setMoveMode(MOTER_GO);
+//  }
+//  if(params->data[0] == MOTER_RIGHT){
+//    //Serial.print("RIGHT");
+//    //wheel.Right);
+//    wheel.setMoveMode(MOTER_RIGHT);
+//  }
+//  if(params->data[0] == MOTER_LEFT){
+//    //Serial.print("LEFT");
+////    wheel.Left();
+//     wheel.setMoveMode(MOTER_LEFT);
+//  
+//  if(params->data[0] == MOTER_BACK){
+//    //Serial.print("BACK");
+//   // wheel.Stop();
+//   wheel.setMoveMode(MOTER_BACK);
+//  }  
+//  if(params->data[0] == MOTER_STOP){
+//    //Serial.print("BACK");
+//   // wheel.Stop();
+//   wheel.setMoveMode(MOTER_STOP);
+//  }
+  //movestate = params->data[0];
+  wheel.mode = params->data[0];
+  //Serial.println(params->data[0]);
+  
 }
 //Write
 void onDataWriteCallback(const GattWriteCallbackParams *params)
-{ Serial.println("GattClient write");}
+{ //Serial.println("GattClient write");
+}
 //Read
 void onDataReadCallback(const GattReadCallbackParams *params)
-{ Serial.println("GattClinet read");}
+{ //Serial.println("GattClinet read");
+}
 //デコーダー
 uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advdata, uint8_t *len,uint8_t *p_field_data)
 {
@@ -207,7 +275,7 @@ uint32_t ble_advdata_parser(uint8_t type, uint8_t advdata_len,  uint8_t *p_advda
 }
 //Caractersitcを発見した時の処理（onConnectinonで呼ばれる）
 void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
-  Serial.println("\r\n----Characteristic Discovered3");
+  //Serial.println("\r\n----Characteristic Discovered3");
 
 //  if(chars->getUUID().shortOrLong() == UUID::UUID_TYPE_SHORT) {
 //    Serial.println(chars->getUUID().getShortUUID(), HEX);
@@ -225,7 +293,7 @@ void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
 //    }
 //  }
   if(chars->getProperties().notify() == 0x01){
-    Serial.println("found notify");
+   // Serial.println("found notify");
     characteristic_is_fond = 1;
     chars_hrm = *chars;
   }
