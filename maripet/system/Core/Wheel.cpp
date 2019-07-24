@@ -16,7 +16,7 @@ void Wheel::PWM_Write(int pinR, int pinL, int pwmspeed) {
   //Serial.println(pwmspeed);
   digitalWrite(pinR, HIGH);
   digitalWrite(pinL, HIGH);
-  delayMicroseconds(2000-pwmspeed);
+  delayMicroseconds(SPEED_MAX - pwmspeed);
   digitalWrite(pinR, LOW);
   digitalWrite(pinL, LOW);
   delayMicroseconds(pwmspeed);
@@ -76,60 +76,69 @@ void Wheel::Go() {
 }
 void Wheel::setMoveMode(int mode) {
   if (moveMode != mode) {
-    Stop();
+    fadecount = 0;
+    //Stop();
     // Serial.println("MODE");
     turnCount = 0;
-    delay(500);
+    //delay(500);
   }
-  switch (mode) {
-    case MOTER_GO: {
-        Go();
-        break;
-      }
-    case MOTER_RIGHT: {
-        Right();
-        break;
-      }
-    case MOTER_LEFT: {
-        Left();
-        break;
-      }
-    case MOTER_STOP: {
-        Stop();
-        break;
-      }
-    case MOTER_BACK: {
-        Back();
-        break;
-      }
+
+  if (fadecount < STOP_FADE) {
+    fadecount++;
+    float rate = (STOP_FADE - fadecount) / STOP_FADE;
+    Speed(SPEED_MAX * rate);
+  } 
+  else {
+    switch (mode) {
+      case MOTER_GO: {
+          Go();
+          break;
+        }
+      case MOTER_RIGHT: {
+          Right();
+          break;
+        }
+      case MOTER_LEFT: {
+          Left();
+          break;
+        }
+      case MOTER_STOP: {
+          Stop();
+          break;
+        }
+      case MOTER_BACK: {
+          Back();
+          break;
+        }
+    }
   }
 
   moveMode = mode;
 
 }
 void Wheel::Stop() {
-  
-    if (mode_pwm) {
-      digitalWrite(pinR0_pwm, HIGH);
-      digitalWrite(pinR1_pwm, HIGH);
-      digitalWrite(pinL0_pwm, HIGH);
-      digitalWrite(pinL1_pwm, HIGH);
-    }
-    else {
-      digitalWrite(pinR0, LOW);
-      digitalWrite(pinR1, LOW);
-      digitalWrite(pinL0, LOW);
-      digitalWrite(pinL1, LOW);
-    }
 
- 
+  if (mode_pwm) {
+    digitalWrite(pinR0_pwm, HIGH);
+    digitalWrite(pinR1_pwm, HIGH);
+    digitalWrite(pinL0_pwm, HIGH);
+    digitalWrite(pinL1_pwm, HIGH);
+  }
+  else {
+    digitalWrite(pinR0, LOW);
+    digitalWrite(pinR1, LOW);
+    digitalWrite(pinL0, LOW);
+    digitalWrite(pinL1, LOW);
+  }
+
+
 }
 
 void Wheel::Right() {
   //  Stop();
   //  delay(1000);
-  if(turnCount < TURN){
-   if (mode_pwm) {
+  if (turnCount < TURN) {
+    if (mode_pwm) {
       digitalWrite(pinR0_pwm, PWM_DIG);
       digitalWrite(pinL1_pwm, PWM_DIG);
       PWM_Write(pinR1_pwm, pinL0_pwm, pwm_speed);
@@ -138,10 +147,10 @@ void Wheel::Right() {
       digitalWrite(pinR1, LOW);
       digitalWrite(pinL0, LOW);
       digitalWrite(pinL1, HIGH);
-    }   
+    }
     turnCount++;
   }
-  else{
+  else {
     mode = MOTER_GO;
   }
 
@@ -151,11 +160,11 @@ void Wheel::Right() {
 void Wheel::Left() {
   //  Stop();
   //  delay(1000);
-  if(turnCount < TURN){
-      if (mode_pwm) {
-    digitalWrite(pinR1_pwm, PWM_DIG);
-    digitalWrite(pinL0_pwm, PWM_DIG);
-    PWM_Write(pinR0_pwm, pinL1_pwm, pwm_speed);
+  if (turnCount < TURN) {
+    if (mode_pwm) {
+      digitalWrite(pinR1_pwm, PWM_DIG);
+      digitalWrite(pinL0_pwm, PWM_DIG);
+      PWM_Write(pinR0_pwm, pinL1_pwm, pwm_speed);
     }
     else {
       digitalWrite(pinR0, LOW);
@@ -164,16 +173,16 @@ void Wheel::Left() {
       digitalWrite(pinL1, LOW);
     }
     turnCount++;
-  }else{
+  } else {
     mode = MOTER_GO;
   }
-  
+
 
 }
 
 void Wheel::Speed(int pwm) {
   pwm_speed = pwm;
-  if (pwm_speed > 2000) pwm_speed = 2000;
+  if (pwm_speed > SPEED_MAX) pwm_speed = SPEED_MAX;
   if (pwm_speed < 0) pwm_speed = 0;
 }
 void Wheel::Back() {

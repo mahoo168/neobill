@@ -27,8 +27,8 @@ void callback() {
 
 void setup() {
   // put your sestup code here, to run once:
-  Serial.begin(9600);
-  Serial.println("BLE START");
+//  Serial.begin(9600);
+//  Serial.println("BLE START");
   //ble
   setupBle();
 

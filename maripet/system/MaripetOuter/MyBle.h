@@ -6,7 +6,7 @@ BLE ble;
 //control flag 
 bool isMove = false;
 bool isFrec = false;
-bool isLED = true;
+bool isLED = false;
 bool isDemoMode = false;
 int demo_go_time = 3000;
 #define PIN_BLE_MODE D4
@@ -79,7 +79,7 @@ void writeSensorDataToAnroid(int val){
 
 void connectcallback( const Gap::ConnectionCallbackParams_t *params)
 {
-  Serial.println("CONNECTED");
+  //Serial.println("CONNECTED");
   if(params->role == Gap::CENTRAL){
      //Serial.println("CONNECTed by PERIFERAL DEVIDE");
      //discoveredServiceCallBack：Serviceを探す
@@ -106,6 +106,9 @@ void disconnection(const Gap::DisconnectionCallbackParams_t *paramss)
     //Serial.println("re Advertising");
     peripheral_handle = BLE_CONN_HANDLE_INVALID;
     central_connected = false;
+    digitalWrite(BLINK_PIN, !digitalRead(BLINK_PIN));
+    delay(5000);
+    digitalWrite(BLINK_PIN, !digitalRead(BLINK_PIN));
     ble.startAdvertising();
   }
   else{
@@ -244,7 +247,7 @@ void hvxCallback(const GattHVXCallbackParams *params)
   }
   
   //動的なデータを送信
-  if(isMove && central_connected){
+  if(isMove && central_connected ){
    // Serial.println("SEND");
      ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), tx_buf, 3);
      delay(1000);
@@ -331,7 +334,7 @@ void discoveredCharacteristicCallBack(const DiscoveredCharacteristic *chars) {
 
 void dataWriteCallback(const GattWriteCallbackParams *Handler){
   uint8_t index;
-Serial.println("aa ");
+//Serial.println("aa ");
   uint8_t buf[TXRX_BUF_LEN];
   uint16_t bytesRead = 20;
  // Serial.println("Write Handle : ");

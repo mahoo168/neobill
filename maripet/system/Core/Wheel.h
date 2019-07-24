@@ -3,6 +3,8 @@
 #define MOTER_LEFT 2
 #define MOTER_BACK 3
 #define MOTER_STOP 4
+#define SPEED_MAX 2000
+#define STOP_FADE 1000
 
 class Wheel{
   public:
@@ -22,6 +24,7 @@ class Wheel{
     int pwm_speed= 1000;
     int moveMode = -1; //0 go ,1 right, 2 left, 3 stop
     int turnCount ;
+    int fadecount = 0;
 //    int pinR0;
 //    int pinL0;
 //    int pinR1;

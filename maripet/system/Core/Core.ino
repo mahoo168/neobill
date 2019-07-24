@@ -208,14 +208,8 @@ void hvxCallback(const GattHVXCallbackParams *params)
  if(isDebug){
     Serial.println(params->data[0]);
   }
-  if(state){
-    digitalWrite(BLINK_PIN_MOBILE, HIGH);
-    state = false;
-  }
-  else{
-    digitalWrite(BLINK_PIN_MOBILE, LOW);
-    state = true;    
-  }
+   digitalWrite(BLINK_PIN_MOBILE, !digitalRead(BLINK_PIN_MOBILE));
+
   
 //  if(params->data[0] == MOTER_GO){
 //    //Serial.print("GO");
